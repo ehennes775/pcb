@@ -1913,7 +1913,7 @@ pcb_main_uninit (void)
    * causes segfaults when terminating the program.
    */
     
-  UnloadFont("all");
+  UnloadFont(&Settings.FontLibrary, "all");
 
     
   uninit_strflags_buf ();
