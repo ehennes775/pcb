@@ -65,6 +65,7 @@
 #include "data.h"
 #include "draw.h"
 #include "error.h"
+#include "font.h"
 #include "insert.h"
 #include "misc.h"
 #include "mirror.h"
@@ -186,6 +187,7 @@ typedef struct
     LayerChangeType LayerChange;
     ClearPolyType ClearPoly;
     NetlistChangeType NetlistChange;
+    FontType *Font;
     long int CopyID;
   }
   Data;
@@ -229,6 +231,7 @@ static bool UndoChangeAngles (UndoListType *);
 static bool UndoChangeClearSize (UndoListType *);
 static bool UndoChangeMaskSize (UndoListType *);
 static bool UndoClearPoly (UndoListType *);
+static bool UndoChangeFont (UndoListType *);
 static int PerformUndo (UndoListType *);
 
 /*!
@@ -1021,6 +1024,31 @@ UndoNetlistChange (UndoListType *Entry)
   return true;
 }
 
+static bool
+UndoChangeFont(UndoListType *Entry)
+{
+    FontType * font;
+    void *ptr1, *ptr2, *ptr3;
+    TextType * text;
+     int type;
+    type =
+    SearchObjectByID (PCB->Data, &ptr1, &ptr2, &ptr3, Entry->ID, Entry->Kind);
+    text = (TextType *)ptr2;
+    switch (type)
+    {
+    case TEXT_TYPE:
+        font = text->Font;
+        text->Font = Entry->Data.Font;
+        Entry->Data.Font = font;
+        break;
+    case ELEMENTNAME_TYPE:
+        /* Not supporting this yet */
+        break;
+    }
+    return true;
+    
+}
+
 /*!
  * \brief Undo of any 'hard to recover' operation.
  *
@@ -1202,6 +1230,10 @@ PerformUndo (UndoListType *ptr)
     case UNDO_MIRROR:
       if (UndoMirror (ptr))
 	return (UNDO_MIRROR);
+      break;
+    case UNDO_CHANGEFONT:
+      if(UndoChangeFont(ptr))
+        return (UNDO_CHANGEFONT);
       break;
     }
   return 0;
@@ -1730,6 +1762,14 @@ AddLayerChangeToUndoList (int old_index, int new_index)
       undo->Data.LayerChange.old_index = old_index;
       undo->Data.LayerChange.new_index = new_index;
     }
+}
+
+void AddObjectToChangeFontUndoList(int Type, void *Ptr1, void *Ptr2, void *Ptr3)
+{
+  UndoListType *undo;
+  TextType *text = (TextType*)Ptr2;
+  undo = GetUndoSlot(UNDO_CHANGEFONT, OBJECT_ID(text), Type);
+  undo->Data.Font = text->Font;
 }
 
 /*!
