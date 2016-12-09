@@ -1154,7 +1154,7 @@ text_hi_format
 			}
 		;
 text_20161008_format
-			/* x, y, direction, scale, text, flags */
+			/* x, y, direction, scale, text, font, flags */
 		: T_TEXT '[' measure measure number number STRING STRING flags ']'
 			{
                 FontType * font = FindFont($8);
