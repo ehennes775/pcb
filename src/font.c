@@ -365,6 +365,7 @@ int
 SetPCBDefaultFont(char * fontname)
 {
     FontType * font;
+    char * str;
     if (!fontname) PCB->DefaultFontName = NULL;
     else {
       /* Check the embedded library */
@@ -382,6 +383,11 @@ SetPCBDefaultFont(char * fontname)
       if (PCB->DefaultFontName) free(PCB->DefaultFontName);
       PCB->DefaultFontName = g_strdup(fontname);
     }
+    /* Note: If I do this, this will increment the UNDO serial number for the Nulls only*/
+    asprintf(&str, "ChangeFont(Null, %s)",
+             PCB->DefaultFontName ? PCB->DefaultFontName : "None");
+    hid_parse_command(str);
+    free(str);
     ELEMENT_LOOP(PCB->Data);
     {
       ELEMENTTEXT_LOOP(element);
@@ -458,7 +464,7 @@ static const char changefont_help[] =
 static int
 ChangeFontAction(int argc, char **argv, Coord x, Coord y)
 {
-    bool changeAll = false;
+    bool changeAll = false, changeSelected = false, changeNull = false;
     int type = NO_TYPE;
     void *ptr1 = 0, *ptr2 = 0, *ptr3 = 0;
     unsigned count = 0;
@@ -494,8 +500,12 @@ ChangeFontAction(int argc, char **argv, Coord x, Coord y)
         }
         else if (strcmp(argv[0], "Selected") == 0)
         {
-            /* not really necessary, but for completeness*/
-            changeAll = false;
+            changeSelected = true;
+            /* continue below */
+        }
+        else if (strcmp(argv[0], "Null") == 0)
+        {
+            changeNull = true;
             /* continue below */
         }
         else if (strcmp(argv[0], "Object") == 0)
@@ -547,7 +557,10 @@ ChangeFontAction(int argc, char **argv, Coord x, Coord y)
          */
         ALLTEXT_LOOP(PCB->Data);
         {
-            if (changeAll || TEST_FLAG(SELECTEDFLAG, text))
+            if (changeAll
+                || (changeSelected && TEST_FLAG(SELECTEDFLAG, text))
+                || (changeNull && !(text->Font))
+                )
             {
                 AddObjectToChangeFontUndoList(TEXT_TYPE, NULL, text, NULL);
                 ChangeObjectFont(layer, text, font);
