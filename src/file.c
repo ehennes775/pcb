@@ -418,6 +418,7 @@ real_load_pcb (char *Filename, bool revert)
   char *new_filename;
   PCBType *newPCB = CreateNewPCB ();
   PCBType *oldPCB;
+  FontType * defaultFont;
 #ifdef DEBUG
   double elapsed;
   clock_t start, end;
@@ -446,12 +447,15 @@ real_load_pcb (char *Filename, bool revert)
       /* update cursor confinement and output area (scrollbars) */
       ChangePCBSize (PCB->MaxWidth, PCB->MaxHeight);
 
-      if (PCB->DefaultFontName)
-      { /* the file specified a default font */
+      defaultFont = FindFont(PCB->DefaultFontName);
+      if (defaultFont)
+      { /* the file specified a default font, and we found it */
         ChangeSystemFont(PCB->DefaultFontName);
+        LockUndo();
         SetPCBDefaultFont(PCB->DefaultFontName);
-        /* what should we do if we can't find the requested font? */
+        UnlockUndo();
       } else if (g_slist_length(PCB->FontLibrary) > 0)
+        /* No font specified, but fonts or symbols included in the file */
 	  { /* Switch to the font found in the PCB file */
         ChangeSystemFont(((FontType*)PCB->FontLibrary->data)->Name);
 	  } else
