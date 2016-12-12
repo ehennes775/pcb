@@ -49,6 +49,8 @@ int        UnloadFont(GSList ** library, char * fontname);
 FontType * ChangeSystemFont(char * fontname);
 int        SetPCBDefaultFont(char * fontname);
 
+int ChangeFonts(int, FontType*);
+
 GSList * FontsUsed();
 
 void SetFontInfo (FontType *);

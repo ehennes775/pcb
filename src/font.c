@@ -361,49 +361,6 @@ ChangeSystemFont(char * fontname)
     return font;
 }
 
-int
-SetPCBDefaultFont(char * fontname)
-{
-    FontType * font;
-    char * str;
-    if (!fontname) PCB->DefaultFontName = NULL;
-    else {
-      /* Check the embedded library */
-      if (PCB) font = FindFontInLibrary(PCB->FontLibrary, fontname);
-      /* Check the system library */
-      if (!font) font = FindFontInLibrary(Settings.FontLibrary, fontname);
-      /* Don't allow setting to an unknown font */
-      if (!font)
-      {
-        Message(_("Could not change PCB default font, font '%s' not found\n"),
-                fontname);
-        return -1;
-      }
-      /* the font was found in one or the other libraries */
-      if (PCB->DefaultFontName) free(PCB->DefaultFontName);
-      PCB->DefaultFontName = g_strdup(fontname);
-    }
-    /* Note: If I do this, this will increment the UNDO serial number for the Nulls only*/
-    asprintf(&str, "ChangeFont(Null, %s)",
-             PCB->DefaultFontName ? PCB->DefaultFontName : "None");
-    hid_parse_command(str);
-    free(str);
-    ELEMENT_LOOP(PCB->Data);
-    {
-      ELEMENTTEXT_LOOP(element);
-      {
-        r_delete_entry (PCB->Data->name_tree[n], (BoxType *) text);
-        text->Font=font;
-        SetTextBoundingBox (text);
-        r_insert_entry (PCB->Data->name_tree[n], (BoxType *) text, 0);
-      }
-      END_LOOP;
-    }
-    END_LOOP;
-    Message(_("PCB default font set to '%s'\n"), PCB->DefaultFontName);
-    return 0;
-}
-
 int ChangeObjectFont(LayerType * Layer, TextType * Text, FontType * Font)
 {
   if (TEST_FLAG (LOCKFLAG, Text)) return -1;
@@ -419,6 +376,70 @@ int ChangeObjectFont(LayerType * Layer, TextType * Text, FontType * Font)
   ClearFromPolygon (PCB->Data, TEXT_TYPE, Layer, Text);
   DrawText (Layer, Text);
   return 0;
+}
+
+enum {
+    NoFonts = 0,
+    AllFonts = 1,
+    SelectedFonts = 2,
+    NullFonts = 4
+};
+
+int ChangeFonts(int Which, FontType * Font){
+    int count = 0;
+    ALLTEXT_LOOP(PCB->Data);
+    {
+        if ((Which & AllFonts)
+            || ((Which & SelectedFonts) && TEST_FLAG(SELECTEDFLAG, text))
+            || ((Which & NullFonts) && !(text->Font))
+            )
+        {
+            AddObjectToChangeFontUndoList(TEXT_TYPE, NULL, text, NULL);
+            ChangeObjectFont(layer, text, Font);
+            count++;
+        }
+    }
+    ENDALL_LOOP;
+    
+    return count;
+}
+
+int
+SetPCBDefaultFont(char * fontname)
+{
+    FontType * font;
+    if (!fontname) PCB->DefaultFontName = NULL;
+    else {
+        /* Check the embedded library */
+        if (PCB) font = FindFontInLibrary(PCB->FontLibrary, fontname);
+        /* Check the system library */
+        if (!font) font = FindFontInLibrary(Settings.FontLibrary, fontname);
+        /* Don't allow setting to an unknown font */
+        if (!font)
+        {
+            Message(_("Could not change PCB default font, font '%s' not found\n"),
+                    fontname);
+            return -1;
+        }
+        /* the font was found in one or the other libraries */
+        if (PCB->DefaultFontName) free(PCB->DefaultFontName);
+        PCB->DefaultFontName = g_strdup(fontname);
+    }
+    ChangeFonts(NullFonts, font);
+    ELEMENT_LOOP(PCB->Data);
+    {
+        ELEMENTTEXT_LOOP(element);
+        {
+            r_delete_entry (PCB->Data->name_tree[n], (BoxType *) text);
+            text->Font=font;
+            SetTextBoundingBox (text);
+            r_insert_entry (PCB->Data->name_tree[n], (BoxType *) text, 0);
+        }
+        END_LOOP;
+    }
+    END_LOOP;
+    Message(_("PCB default font set to '%s'\n"), PCB->DefaultFontName);
+    return 0;
 }
 
 static const char changefont_syntax[] =
@@ -464,10 +485,8 @@ static const char changefont_help[] =
 static int
 ChangeFontAction(int argc, char **argv, Coord x, Coord y)
 {
-    bool changeAll = false, changeSelected = false, changeNull = false;
     int type = NO_TYPE;
     void *ptr1 = 0, *ptr2 = 0, *ptr3 = 0;
-    unsigned count = 0;
     FontType * font;
     
     if (argc < 1)
@@ -494,19 +513,15 @@ ChangeFontAction(int argc, char **argv, Coord x, Coord y)
         
         if (strcmp(argv[0], "All") == 0)
         {
-            /* We'll loop over objects in a moment */
-            changeAll = true;
-            /* continue below */
+            if(ChangeFonts(AllFonts, font))                  IncrementUndoSerialNumber();
         }
         else if (strcmp(argv[0], "Selected") == 0)
         {
-            changeSelected = true;
-            /* continue below */
+            if(ChangeFonts(SelectedFonts, font))                  IncrementUndoSerialNumber();
         }
         else if (strcmp(argv[0], "Null") == 0)
         {
-            changeNull = true;
-            /* continue below */
+            if(ChangeFonts(NullFonts, font))                  IncrementUndoSerialNumber();
         }
         else if (strcmp(argv[0], "Object") == 0)
         {
@@ -549,27 +564,6 @@ ChangeFontAction(int argc, char **argv, Coord x, Coord y)
             Message(_("ChangeFont: Unknown operand.\n"));
             return -1;
         }
-        
-        /* We're only here if the option was "All" or "Selected" */
-        /* Loop over all text objects */
-        /* If changeAll is true, change every text object we find */
-        /* If changeAll is false, change only objects with the selected flag set
-         */
-        ALLTEXT_LOOP(PCB->Data);
-        {
-            if (changeAll
-                || (changeSelected && TEST_FLAG(SELECTEDFLAG, text))
-                || (changeNull && !(text->Font))
-                )
-            {
-                AddObjectToChangeFontUndoList(TEXT_TYPE, NULL, text, NULL);
-                ChangeObjectFont(layer, text, font);
-                count++;
-            }
-        }
-        ENDALL_LOOP;
-        /* only increment if something changed */
-        if (count > 0) IncrementUndoSerialNumber();
     }
     else
     {
