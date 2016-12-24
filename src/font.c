@@ -3,9 +3,8 @@
  *
  * \brief Functions for loading and manipulating fonts
  *
- * \TODO Some of the user actions are very similar and may be able to be
+ * \todo Some of the user actions are very similar and may be able to be
  *       consolidated.
- *
  * <hr>
  *
  * <h1><b>Copyright.</b></h1>\n
@@ -74,7 +73,7 @@ compare_font_names(FontType * a, FontType * b)
 {
     return g_ascii_strcasecmp(a->Name, b->Name);
 }
-/*
+/*!
  * /brief Creates a new empty font structure in the indicated library
  */
 FontType *
@@ -104,6 +103,9 @@ CreateNewFontInLibrary(GSList ** library, char * name)
     return newfont;
 }
 
+/*!
+ * \brief Free memory associated with a font
+ */
 int
 FreeFontMemory(FontType * font)
 {
@@ -134,7 +136,7 @@ check_font_source(FontType * font, char * filename)
 }
 
 /*!
- * \brief Finds a font by name or source file in the given font library
+ * \brief Finds a font by name or source file in the given font library.
  */
 FontType *
 FindFontInLibrary(GSList * library, char * name)
@@ -150,6 +152,14 @@ FindFontInLibrary(GSList * library, char * name)
     return NULL;
 }
 
+/*!
+ * \brief Return a pointer to the font specified by font name
+ *
+ * Search for the font specified by fontname. The embedded library is searched
+ * first, and if its not found, then the system library is searched. Return
+ * a pointer to the font object.
+ *
+ */
 FontType *
 FindFont(char * fontname)
 {
@@ -162,6 +172,13 @@ FindFont(char * fontname)
     return NULL;
 }
 
+/*!
+ * \brief Search for fonts in the font path and load them.
+ *
+ * For each path in the font path string, read the files in the directory. 
+ * Iterate over the files looking for files that end in .pcb_font, and for
+ * each of these, try to load it as a font.
+ */
 int
 ScanFontPaths(void)
 {
@@ -199,8 +216,14 @@ ScanFontPaths(void)
     return 0;
 }
 
-/*
+/*!
  * \brief Loads a new font from a file
+ * 
+ * Check for the font in the system library, and if its already loaded, don't 
+ * load it again. Otherwise, try to parse the file. If successful, fill in the
+ * name of the font in the structure and sort the library.
+ *
+ * /todo If the file fails to parse, is it still in the library?
  */
 FontType *
 LoadFont(char * filename)
@@ -226,7 +249,7 @@ LoadFont(char * filename)
     return font;
 }
 
-/*
+/*!
  * \brief Removes a font from a font libary
  * 
  * UnloadFont removes the named font out of the libary indicated. The library
@@ -287,9 +310,9 @@ UnloadFont(GSList ** pLibrary, char * fontname)
 /*!
  * \brief Create a list of the fonts used in a design.
  *
- * This function iterates over all of the text objects and refdes in the design 
- * and builds up a GSList of pointers to all of the fonts that are used by at 
- * least one object.
+ * This function iterates over all of the text objects and refdes in the
+ * design and builds up a GSList of pointers to all of the fonts that are used
+ * by at least one object.
  *
  * The GSList is dynamically allocated, so, when the calling function is
  * done with the list, it should also free it using g_slist_free.
@@ -361,6 +384,13 @@ ChangeSystemFont(char * fontname)
     return font;
 }
 
+/*!
+ * \brief Change the font of an object.
+ *
+ * Change the font pointer of an object, update the rtrees and polygons, and
+ * redraw the text.
+ *
+ */
 int ChangeObjectFont(LayerType * Layer, TextType * Text, FontType * Font)
 {
   if (TEST_FLAG (LOCKFLAG, Text)) return -1;
@@ -385,6 +415,13 @@ enum {
     NullFonts = 4
 };
 
+/*!
+ * \brief Change the font of multiple objects.
+ *
+ * Loop over all of the text in a design and change the font of the indicated
+ * objects to the specified font. 
+ *
+ */
 int ChangeFonts(int Which, FontType * Font){
     int count = 0;
     ALLTEXT_LOOP(PCB->Data);
@@ -577,7 +614,12 @@ ChangeFontAction(int argc, char **argv, Coord x, Coord y)
 static const char listfonts_syntax[] = "ListFonts()";
 
 static const char listfonts_help[] = "List fonts in library.";
+/* %start-doc actions ListFonts
+ 
+List all of the fonts in system and embedded libraries, which are selected, and 
+which are currently in use.
 
+%end-doc */
 static int
 ListFontsAction(int argc, char **argv, Coord x, Coord y)
 {
@@ -601,9 +643,11 @@ ListFontsAction(int argc, char **argv, Coord x, Coord y)
 static const char loadfont_syntax[] = "LoadFont(filename)";
 
 static const char loadfont_help[] = "Load font data from a file.";
-/*!
- * \brief User Action to load a new font
- */
+/* %start-doc actions LoadFont
+ 
+Load a font from a file into the system font library.
+
+%end-doc */
 static int
 LoadFontAction (int argc, char **argv, Coord x, Coord y)
 {
@@ -620,14 +664,14 @@ LoadFontAction (int argc, char **argv, Coord x, Coord y)
 static const char unloadfont_syntax[] = "UnloadFont(filename)";
 
 static const char unloadfont_help[] = "Unload font data from the system library.";
-/*!
- * \brief User Action to unload a font
- *
- * UnloadFontAction is the users way of removing a font from the system library.
- * The user can only modify the SystemFontLibrary. The EmbeddedFontLibrary is
- * generated only by loading font data from PCB files.
- *
- */
+
+/* %start-doc actions UnloadFont
+
+UnloadFontAction is the users way of removing a font from the system library.
+The user can only modify the SystemFontLibrary. The EmbeddedFontLibrary is
+generated only by loading font data from PCB files.
+
+ %end-doc */
 static int
 UnloadFontAction (int argc, char **argv, Coord x, Coord y)
 {
