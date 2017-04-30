@@ -1306,9 +1306,9 @@ SetCrosshairRange (Coord MinX, Coord MinY, Coord MaxX, Coord MaxY)
   FitCrosshairIntoGrid (Crosshair.X, Crosshair.Y);
 }
 
-/*
- * Define snaps
- */
+/** * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **
+ *                                Define snaps                                 *
+ ** * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 /* Wrapper around the old snapping routine */
 static SnapSpecType default_snap = {
@@ -1342,6 +1342,47 @@ static SnapSpecType grid_snap = {
   100000,          // radius (nm)
   0                // object type
 };
+
+/* Snap to pins and pads */
+SnapType
+snap_pins_pads(Coord x, Coord y, Coord r)
+{
+  SnapType snap;
+  void * p1, * p2, * p3;
+  PadType *pad;
+  PinType * pin;
+  snap.valid = false;
+  snap.obj_type = SearchObjectByLocation (PIN_TYPE | PAD_TYPE, &p1, &p2, &p3,
+                                          x, y, r);
+  switch(snap.obj_type)
+  {
+    case PIN_TYPE:
+      pin = (PinType*)p2;
+      snap.loc.X = pin->X; snap.loc.Y = pin->Y;
+      snap.valid = true;
+      break;
+    case PAD_TYPE:
+      pad = (PadType *)p2;
+      snap.loc.X = pad->Point1.X + (pad->Point2.X - pad->Point1.X) / 2;
+      snap.loc.Y = pad->Point1.Y + (pad->Point2.Y - pad->Point1.Y) / 2;
+      snap.valid = true;
+      break;
+    default:
+      break;
+  }
+  snap.distsq = square(snap.loc.X - x) + square(snap.loc.Y - y);
+  return snap;
+}
+
+static SnapSpecType pin_pad_snap = {
+  "Snap to Pins and Pads",  // Name
+  &snap_pins_pads,          // Function pointer
+  true,                     // enabled
+  10,                       // priority
+  1000000,                  // radius (nm)
+  0                         // object type
+};
+
 
 /*!
  * \brief Initializes crosshair stuff.
