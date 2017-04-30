@@ -1226,19 +1226,23 @@ FitCrosshairIntoGrid (Coord X, Coord Y)
       && Crosshair.AttachedLine.State != STATE_FIRST
       && TEST_FLAG (AUTODRCFLAG, PCB))
     EnforceLineDRC ();
-  
-  //gui->set_crosshair (Crosshair.X, Crosshair.Y, HID_SC_DO_NOTHING);
 }
 
-bool
-FitCrosshairIntoGridWrapper(SnapType * snap, Coord x, Coord y)
+SnapType
+FitCrosshairIntoGridWrapper(Coord x, Coord y, Coord r)
 {
+  SnapType ret;
+  ret.valid = false;
   FitCrosshairIntoGrid(x, y);
-  snap->location.X = Crosshair.X;
-  snap->location.Y = Crosshair.Y;
-  snap->distsq = square(Crosshair.X - x) + square(Crosshair.Y - y);
-  snap->obj_type = 0;
-  return true;
+  ret.distsq = square(Crosshair.X - x) + square(Crosshair.Y - y);
+  if (ret.distsq < square(r))
+  {
+    ret.valid = true;
+    ret.loc.X = Crosshair.X;
+    ret.loc.Y = Crosshair.Y;
+    ret.obj_type = 0;
+  }
+  return ret;
 }
 
 /*!
@@ -1254,10 +1258,18 @@ MoveCrosshairAbsolute (Coord X, Coord Y)
   SnapType * snap;
 
   snap = Crosshair.snap(Crosshair.snaps, X, Y);
-  Crosshair.X = snap->location.X;
-  Crosshair.Y = snap->location.Y;
+  if (snap)
+  {
+    Crosshair.X = CLAMP(snap->loc.X, Crosshair.MinX, Crosshair.MaxX);
+    Crosshair.Y = CLAMP(snap->loc.Y, Crosshair.MinY, Crosshair.MaxY);
+  }
+  else
+  {
+    Crosshair.X = CLAMP (X, Crosshair.MinX, Crosshair.MaxX);
+    Crosshair.Y = CLAMP (Y, Crosshair.MinY, Crosshair.MaxY);
+  }
   
-  gui->set_crosshair (snap->location.X, snap->location.Y,
+  gui->set_crosshair (Crosshair.X, Crosshair.Y,
                       HID_SC_DO_NOTHING);
 
   if (Crosshair.X != old_x || Crosshair.Y != old_y)
@@ -1294,15 +1306,20 @@ SetCrosshairRange (Coord MinX, Coord MinY, Coord MaxX, Coord MaxY)
   FitCrosshairIntoGrid (Crosshair.X, Crosshair.Y);
 }
 
+static SnapSpecType default_snap = {
+  "Default Snap",               // Name
+  &FitCrosshairIntoGridWrapper, // Function pointer
+  true,                         // enabled
+  1000,                         // priority
+  500000,                       // radius
+  0                             // object type
+};
+
 /*!
  * \brief Initializes crosshair stuff.
  *
  * Clears the struct, allocates to graphical contexts.
  */
-
-SnapType default_snap = {"Default Snap", &FitCrosshairIntoGridWrapper,
-  true, 1000, 10, 0, {0,0,0,0,0}, 0};
-
 void
 InitCrosshair (void)
 {
