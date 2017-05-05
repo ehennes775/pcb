@@ -1312,7 +1312,7 @@ SetCrosshairRange (Coord MinX, Coord MinY, Coord MaxX, Coord MaxY)
 
 /* Wrapper around the old snapping routine */
 static SnapSpecType default_snap = {
-  "Default Snap",               // Name
+  "Default snap",               // Name
   &FitCrosshairIntoGridWrapper, // Function pointer
   true,                         // enabled
   1000,                         // priority
@@ -1321,8 +1321,8 @@ static SnapSpecType default_snap = {
 };
 
 /* Snap to the grid */
-SnapType
-snap_grid(Coord x, Coord y, Coord r)
+static SnapType
+snap_to_grid(Coord x, Coord y, Coord r)
 {
   SnapType snap;
   snap.obj_type = 0; // would be grid if there was a grid type
@@ -1335,8 +1335,8 @@ snap_grid(Coord x, Coord y, Coord r)
 }
 
 static SnapSpecType grid_snap = {
-  "Snap to Grid",  // Name
-  &snap_grid,      // Function pointer
+  "Snap to grid",  // Name
+  &snap_to_grid,      // Function pointer
   true,            // enabled
   0,               // priority
   100000,          // radius (nm)
@@ -1344,8 +1344,8 @@ static SnapSpecType grid_snap = {
 };
 
 /* Snap to pins and pads */
-SnapType
-snap_pins_pads(Coord x, Coord y, Coord r)
+static SnapType
+snap_to_pins_pads(Coord x, Coord y, Coord r)
 {
   SnapType snap;
   void * p1, * p2, * p3;
@@ -1375,15 +1375,185 @@ snap_pins_pads(Coord x, Coord y, Coord r)
 }
 
 static SnapSpecType pin_pad_snap = {
-  "Snap to Pins and Pads",  // Name
-  &snap_pins_pads,          // Function pointer
+  "Snap to pins and pads",  // Name
+  &snap_to_pins_pads,          // Function pointer
+  true,                     // enabled
+  20,                       // priority
+  1000000,                  // radius (nm)
+  0                         // object type
+};
+
+/* Snap to elements */
+static SnapType
+snap_to_elements(Coord x, Coord y, Coord r)
+{
+  SnapType snap;
+  void *p1, *p2, *p3;
+  snap.valid = false;
+  
+  /* if we're not drawing rats, check for elements first */
+  if (PCB->RatDraw) return snap;
+  
+  snap.obj_type = SearchObjectByLocation (ELEMENT_TYPE, &p1, &p2, &p3,
+                                          x, y, r);
+  
+  if (snap.obj_type & ELEMENT_TYPE)
+  {
+    /* if we found an element, check to see if we should snap to it */
+    ElementType *el = (ElementType *) p1;
+    snap.loc.X = el->MarkX; snap.loc.Y = el->MarkY;
+    snap.distsq = square(snap.loc.X - x) + square(snap.loc.Y - y);
+    snap.valid = true;
+  }
+  return snap;
+}
+
+static SnapSpecType element_snap = {
+  "Snap to elements",       // Name
+  &snap_to_elements,           // Function pointer
   true,                     // enabled
   10,                       // priority
   1000000,                  // radius (nm)
   0                         // object type
 };
 
+/* snap to vias */
+static SnapType
+snap_to_vias(Coord x, Coord y, Coord r)
+{
+  SnapType snap;
+  void *p1, *p2, *p3;
+  snap.valid = false;
 
+  /* Avoid snapping vias to any other vias */
+  if (Settings.Mode == MOVE_MODE && Crosshair.AttachedObject.Type == VIA_TYPE)
+    return snap;
+  
+  if (TEST_FLAG (SNAPPINFLAG, PCB))
+    snap.obj_type = SearchObjectByLocation (VIA_TYPE, &p1, &p2, &p3, x, y, r);
+
+  if (snap.obj_type & VIA_TYPE)
+  {
+    /* found a via, try snapping to it */
+    PinType *pin = (PinType *)p2;
+    snap.loc.X = pin->X; snap.loc.Y = pin->Y;
+    snap.distsq = square(snap.loc.X - x) + square(snap.loc.Y - y);
+    snap.valid = true;
+  }
+  return snap;
+}
+
+static SnapSpecType via_snap = {
+  "Snap to vias",       // Name
+  &snap_to_vias,           // Function pointer
+  true,                 // enabled
+  30,                   // priority
+  1000000,              // radius (nm)
+  0                     // object type
+};
+
+/* snap to lines */
+static SnapType
+snap_to_lines(Coord x, Coord y, Coord r)
+{
+  SnapType snap;
+  void *p1, *p2, *p3;
+  snap.valid = false;
+  
+  /* try snapping to the end points of lines */
+  snap.obj_type = SearchObjectByLocation (LINEPOINT_TYPE,
+                                  &p1, &p2, &p3,
+                                  x, y, r);
+  if (snap.obj_type & LINEPOINT_TYPE)
+  {
+    /* found an end point, try to snap to it */
+    PointType *pnt = (PointType *)p3;
+    snap.loc.X = pnt->X; snap.loc.Y = pnt->Y;
+    snap.valid = true;
+    snap.distsq = square(snap.loc.X - x) + square(snap.loc.Y - y);
+  }
+  
+  /* try snapping to a point on a line that's not on the grid */
+  /* I'll deal with snapping to off grid lines later */
+  //check_snap_offgrid_line (&snap_data, nearest_grid_x, nearest_grid_y);
+  
+  return snap;
+}
+
+static SnapSpecType line_snap = {
+  "Snap to lines",       // Name
+  &snap_to_lines,       // Function pointer
+  true,                 // enabled
+  40,                   // priority
+  1000000,              // radius (nm)
+  0                     // object type
+};
+
+/* snap to arcs */
+static SnapType
+snap_to_arcs(Coord x, Coord y, Coord r)
+{
+  SnapType snap;
+  void *p1, *p2, *p3;
+  snap.valid = false;
+  
+  /* try snapping to the end points of arcs */
+  if (TEST_FLAG (SNAPPINFLAG, PCB))
+    snap.obj_type = SearchObjectByLocation (ARCPOINT_TYPE,
+                                            &p1, &p2, &p3,
+                                            x, y, r);
+  
+  if (snap.obj_type & ARCPOINT_TYPE)
+  {
+    /* found an end point, try to snap to it */
+    PointType *pnt = (PointType *)p3;
+    snap.loc.X = pnt->X; snap.loc.Y = pnt->Y;
+    snap.valid = true;
+    snap.distsq = square(snap.loc.X - x) + square(snap.loc.Y - y);
+  }
+  
+  return snap;
+}
+static SnapSpecType arc_snap = {
+  "Snap to arcs",       // Name
+  &snap_to_arcs,        // Function pointer
+  true,                 // enabled
+  50,                   // priority
+  1000000,              // radius (nm)
+  0                     // object type
+};
+
+/* snap to polygon points */
+static SnapType
+snap_to_polygons(Coord x, Coord y, Coord r)
+{
+  SnapType snap;
+  void *p1, *p2, *p3;
+  snap.valid = false;
+  
+  /* try snapping to a point defining a polygon */
+  snap.obj_type = SearchObjectByLocation (POLYGONPOINT_TYPE, &p1, &p2, &p3,
+                                  x, y, r);
+  
+  if (snap.obj_type & POLYGONPOINT_TYPE)
+  {
+    /* found a polygon point, try snapping to it */
+    PointType *pnt = (PointType *)p3;
+    snap.loc.X = pnt->X; snap.loc.Y = pnt->Y;
+    snap.valid = true;
+    snap.distsq = square(snap.loc.X - x) + square(snap.loc.Y - y);
+  }
+  
+  return snap;
+}
+static SnapSpecType polygon_snap = {
+  "Snap to polygon points", // Name
+  &snap_to_polygons,        // Function pointer
+  true,                 // enabled
+  60,                   // priority
+  1000000,              // radius (nm)
+  0                     // object type
+};
 /*!
  * \brief Initializes crosshair stuff.
  *
@@ -1404,7 +1574,14 @@ InitCrosshair (void)
   Marked.status = false;
   Crosshair.snap = &snap_list_search_snaps;
   Crosshair.snaps = snap_list_new();
-  snap_list_add_snap(Crosshair.snaps, &default_snap);
+  //snap_list_add_snap(Crosshair.snaps, &default_snap);
+  snap_list_add_snap(Crosshair.snaps, &grid_snap);
+  snap_list_add_snap(Crosshair.snaps, &pin_pad_snap);
+  snap_list_add_snap(Crosshair.snaps, &element_snap);
+  snap_list_add_snap(Crosshair.snaps, &via_snap);
+  snap_list_add_snap(Crosshair.snaps, &line_snap);
+  snap_list_add_snap(Crosshair.snaps, &arc_snap);
+  snap_list_add_snap(Crosshair.snaps, &polygon_snap);
 }
 
 /*!
