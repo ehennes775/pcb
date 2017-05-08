@@ -1269,8 +1269,7 @@ MoveCrosshairAbsolute (Coord X, Coord Y)
     Crosshair.Y = CLAMP (Y, Crosshair.MinY, Crosshair.MaxY);
   }
   
-  gui->set_crosshair (Crosshair.X, Crosshair.Y,
-                      HID_SC_DO_NOTHING);
+  gui->set_crosshair (Crosshair.X, Crosshair.Y, HID_SC_DO_NOTHING);
 
   if (Crosshair.X != old_x || Crosshair.Y != old_y)
     {
@@ -1458,25 +1457,61 @@ snap_to_lines(Coord x, Coord y, Coord r)
 {
   SnapType snap;
   void *p1, *p2, *p3;
+  PointType *pnt;
+  LineType * line;
+  Coord x1, y1, dx, dy;  // parameters for the line we're snapping to
+  Coord x2, y2;
+  static int count = 0;
   snap.valid = false;
   
   /* try snapping to the end points of lines */
-  snap.obj_type = SearchObjectByLocation (LINEPOINT_TYPE,
+  snap.obj_type = SearchObjectByLocation (LINEPOINT_TYPE | LINE_TYPE,
                                   &p1, &p2, &p3,
                                   x, y, r);
+  
+  if (snap.obj_type == NO_TYPE) return snap;
+  
+  snap.valid = true;
   if (snap.obj_type & LINEPOINT_TYPE)
   {
     /* found an end point, try to snap to it */
-    PointType *pnt = (PointType *)p3;
+    pnt = (PointType *)p3;
     snap.loc.X = pnt->X; snap.loc.Y = pnt->Y;
-    snap.valid = true;
-    snap.distsq = square(snap.loc.X - x) + square(snap.loc.Y - y);
+  }
+  else
+  {
+    /* try snapping to a point on a line that's not on the grid */
+    line = (LineType*)p2;
+  
+    x1 = line->Point1.X; y1 = line->Point1.Y;
+    x2 = line->Point2.X; y2 = line->Point2.Y;
+    
+    dx = x2-x1;
+    dy = y2-y1;
+    
+    if (dy == 0)
+    {
+      snap.loc.X = x;
+      snap.loc.Y = y1;
+    }
+    else if (dx == 0)
+    {
+      snap.loc.X = x1;
+      snap.loc.Y = y;
+    }
+    else if (ABS(dy) > ABS(dx))
+    {
+      snap.loc.X = (y - y1) * dx / dy + x1;
+      snap.loc.Y = y;
+    }
+    else
+    {
+      snap.loc.X = x;
+      snap.loc.Y = (x - x1) * dy / dx + y1;
+    }
   }
   
-  /* try snapping to a point on a line that's not on the grid */
-  /* I'll deal with snapping to off grid lines later */
-  //check_snap_offgrid_line (&snap_data, nearest_grid_x, nearest_grid_y);
-  
+  snap.distsq = square(snap.loc.X - x) + square(snap.loc.Y - y);
   return snap;
 }
 
