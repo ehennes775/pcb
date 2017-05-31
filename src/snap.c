@@ -42,6 +42,9 @@
  * Snap Type functions
  */
 
+/*!
+ * \brief SnapSpec constructor
+ */
 SnapSpecType *
 snap_spec_new(char * name, int priority)
 {
@@ -54,8 +57,11 @@ snap_spec_new(char * name, int priority)
   return snap;
 }
 
+/*!
+ * \brief SnapSpec destructor
+ */
 void
-snap_delete(SnapSpecType * snap)
+snap_spec_delete(SnapSpecType * snap)
 {
   free(snap->name);
   free(snap);
@@ -66,8 +72,9 @@ snap_delete(SnapSpecType * snap)
  */
 
 /*!
- * \brief Create a new snap list.
+ * \brief SnapList constructor
  *
+ * Create a new snap list.
  * Allocate and initialize memory for a snap list structure.
  *
  */
@@ -82,7 +89,9 @@ snap_list_new(void)
 }
 
 /*!
- * \brief Delete a snap list.
+ * \brief SnapList destructor 
+ *
+ * Delete a snap list.
  * 
  * Free the memory allocated to the snap list. This frees all of the snaps in 
  * the list, since we make copies of them.
