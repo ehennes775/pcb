@@ -1335,7 +1335,7 @@ snap_to_grid(Coord x, Coord y, Coord r)
 
 static SnapSpecType grid_snap = {
   "Snap to grid",  // Name
-  &snap_to_grid,      // Function pointer
+  &snap_to_grid,   // Function pointer
   true,            // enabled
   0,               // priority
   100000,          // radius (nm)
@@ -1375,7 +1375,7 @@ snap_to_pins_pads(Coord x, Coord y, Coord r)
 
 static SnapSpecType pin_pad_snap = {
   "Snap to pins and pads",  // Name
-  &snap_to_pins_pads,          // Function pointer
+  &snap_to_pins_pads,       // Function pointer
   true,                     // enabled
   20,                       // priority
   1000000,                  // radius (nm)
@@ -1409,7 +1409,7 @@ snap_to_elements(Coord x, Coord y, Coord r)
 
 static SnapSpecType element_snap = {
   "Snap to elements",       // Name
-  &snap_to_elements,           // Function pointer
+  &snap_to_elements,        // Function pointer
   true,                     // enabled
   10,                       // priority
   1000000,                  // radius (nm)
@@ -1444,7 +1444,7 @@ snap_to_vias(Coord x, Coord y, Coord r)
 
 static SnapSpecType via_snap = {
   "Snap to vias",       // Name
-  &snap_to_vias,           // Function pointer
+  &snap_to_vias,        // Function pointer
   true,                 // enabled
   30,                   // priority
   1000000,              // radius (nm)
@@ -1516,7 +1516,7 @@ snap_to_lines(Coord x, Coord y, Coord r)
 }
 
 static SnapSpecType line_snap = {
-  "Snap to lines",       // Name
+  "Snap to lines",      // Name
   &snap_to_lines,       // Function pointer
   true,                 // enabled
   40,                   // priority
@@ -1584,10 +1584,10 @@ snap_to_polygons(Coord x, Coord y, Coord r)
 static SnapSpecType polygon_snap = {
   "Snap to polygon points", // Name
   &snap_to_polygons,        // Function pointer
-  true,                 // enabled
-  60,                   // priority
-  1000000,              // radius (nm)
-  0                     // object type
+  true,                     // enabled
+  60,                       // priority
+  1000000,                  // radius (nm)
+  0                         // object type
 };
 /*!
  * \brief Initializes crosshair stuff.

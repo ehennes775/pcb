@@ -51,20 +51,29 @@ typedef struct SnapSpecStruct SnapSpecType;
    This should probably include a pointer to the object that was found. If it
    did then there may be no need for the obj_type. The object would also know
    where it is, but the snap point might not actually be where the object it, 
-   for example, if we're snapping to a point along a line.
+   for example, if we're snapping to a point along a line. One reason to include
+   such a pointer would be so that we can avoid snapping to something that's 
+   already attached to the crosshair.
+ 
+   What if there isn't an actual object to point to? Like, a grid point for
+   example? I guess we return a null pointer if there's no object to be attached
+   to...
+ 
  */
 typedef struct
 {
   /*! A pointer to the SnapSpec that this came from. */
   SnapSpecType * spec;
+  /*! The type of the object that was found. */
+  unsigned obj_type;
+  /*! A pointer to the object that was found */
+  void * object;
   /*! A bool to indicate that an object was found. */
   bool valid;
   /*! The point to snap to. */
   PointType loc;
   /*! The square of the distance from the mouse pointer to the snap point. */
   Coord distsq;
-  /*! The type of the object that was found. */
-  unsigned obj_type;
 } SnapType;
 
 /*
@@ -117,10 +126,16 @@ struct SnapSpecStruct
     \sa SnapSpecStruct
  */
 SnapSpecType * snap_spec_new(char * name, int priority);
+
 /*! \brief SnapSpec destructor
  *  \param snap The snap to free from memory.
  */
 void snap_spec_delete(SnapSpecType * snap);
+
+/*! \brief SnapSpec copy constructor
+ *  \param snap The snap to copy
+ */
+SnapSpecType * snap_spec_copy(SnapSpecType * snap);
 
 /*
  * Snap List Type and functions

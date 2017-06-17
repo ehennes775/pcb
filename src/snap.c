@@ -26,6 +26,27 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301  USA
  *
+ *
+ * TODO:
+ *   * Big major todo list item is to implement an action interface for the snap
+ *     list so that the user can configure the snaps from the command line. This
+ *     is almost essential unles I want to implement something in the lesstif
+ *     hid as well as the gtk hid and all future graphical hids.
+ *
+ *   * snapping should really have a radius in pixels on the screen, not
+ *     the linear distance in mm or mils. In the later case, the snapping radius
+ *     doesn't change with zoom level, which is, I think a desireable feature.
+ *     Maybe I can implement this as an option.
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
  */
 
 #include "snap.h"
@@ -36,7 +57,10 @@
 #include <stdbool.h>
 
 #include "global.h"
-#include "search.h"
+
+#include "data.h"   // Crosshair structure
+#include "error.h"  // Message
+#include "search.h" // Searching functions
 
 /*
  * Snap Type functions
@@ -66,6 +90,19 @@ snap_spec_delete(SnapSpecType * snap)
   free(snap->name);
   free(snap);
 }
+
+/*!
+ * \brief SnapSpec copy constructor
+ */
+
+SnapSpecType *
+snap_spec_copy(SnapSpecType * snap)
+{
+  SnapSpecType * new_snap = malloc (sizeof(SnapSpecType));
+  memcpy(new_snap, snap, sizeof(SnapSpecType));
+  return new_snap;
+}
+
 
 /*
  * Snap List Type functions
@@ -131,7 +168,10 @@ snap_list_add_snap(SnapListType * list, SnapSpecType * snap)
     /* use the name to detect and reject duplicates */
     if (strcmp (list->snaps[i].name, snap->name)==0) return NULL;
     /* make a note of where to insert the entry */
-    if (snap->priority > list->snaps[i].priority) in = i;
+    if (snap->priority > list->snaps[i].priority) {
+      in = i;
+      break;
+    }
   }
   
   /* reallocate the memory to the new size */
@@ -185,9 +225,13 @@ snap_list_find_snap_by_name(SnapListType * list, char * name)
 int snap_list_list_snaps(SnapListType * snaps)
 {
   int i;
-  printf("List has %d snaps out of a maximum %d\n", snaps->n, snaps->max);
+  Message("List has %d snaps out of a maximum %d\n", snaps->n, snaps->max);
   for(i=0; i< snaps->n; i++)
-    printf("\tsnap: %s (%d)\n", snaps->snaps[i].name, snaps->snaps[i].priority);
+    Message("\t%s (%s, r = %d, p = %d)\n",
+            snaps->snaps[i].name,
+            snaps->snaps[i].enabled ? "enabled":"disabled",
+            snaps->snaps[i].radius,
+            snaps->snaps[i].priority);
   return 0;
 }
 
@@ -205,3 +249,20 @@ snap_list_search_snaps(SnapListType * list, Coord x, Coord y)
   }
   return NULL;
 }
+
+static const char listsnaps_help[] = "Print the list of snaps to the log window";
+static const char listsnaps_syntax[] = "ListSnaps()";
+
+static int
+ActionListSnaps(int argc, char **argv, Coord x, Coord y)
+{
+  snap_list_list_snaps(Crosshair.snaps);
+  return 0;
+}
+
+
+HID_Action snap_action_list[] = {
+  {"ListSnaps", 0, ActionListSnaps, listsnaps_help, listsnaps_syntax}
+};
+
+REGISTER_ACTIONS(snap_action_list)
