@@ -40,12 +40,14 @@
 #include "global.h"
 #include "action.h"
 #include "change.h"
-#include "file.h"
-#include "error.h"
+#include "data.h"
 #include "draw.h"
+#include "error.h"
+#include "file.h"
 #include "misc.h" /* MKDIR() */
 #include "pcb-printf.h"
 #include "set.h"
+#include "snap.h"
 
 #if 0
 #include <locale.h>
@@ -1778,6 +1780,129 @@ ghid_config_layer_name_update (gchar * name, gint layer)
     }
 }
 
+  /* -------------- The snapping config page ----------------
+   */
+
+static GtkWidget *config_snaps_vbox, *config_snaps_table;
+
+
+typedef struct {
+  /* If we keep this pointer, then we need to figure out what happens if the
+     particular snap is removed, for example, if a plugin is unloaded. The 
+     dialog is regenerated everytime the window is open, so, that helps, but if
+     something were to remove or add one while the window is still open, there
+     could be a problem. 
+   
+     Instead of storing a pointer, I should just store the name. Look up the
+     name in the snap list, and get the pointer that way. Then if the snap is no
+     longer in the list, I can just not do anything.
+   */
+  char * snap_name;
+  GtkWidget *lbl_name, *cb_en, *spn_rad, *spn_pri;
+} ConfigSnapType;
+
+ConfigSnapType * config_snaps = 0;
+
+/* Several different signals call this callback, and they all have slightly
+ * different signatures because they come from different kinds of widgets. I'm
+ * not presently using that pointer in the callback, so at the moment it doesn't
+ * matter, but in the future if something changes, it could.
+ */
+static void
+config_snap_set_cb(GtkWidget * w, gpointer p)
+{
+  ConfigSnapType * cfg_snap = (ConfigSnapType*)p;
+  SnapSpecType * snap = snap_list_find_snap_by_name(Crosshair.snaps, cfg_snap->snap_name);
+  int priority;
+  int radius;
+  
+  if (snap == NULL) return;
+  
+  snap->enabled =
+    gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(cfg_snap->cb_en));
+  /* Displayed units are to be mm, but the structure stores nm */
+  radius = gtk_spin_button_get_value(GTK_SPIN_BUTTON(cfg_snap->spn_rad))*1e6;
+  snap->radius = radius;
+  
+  /* TODO: If the priority changes, we also have to update position of the
+           snap in the snap list. */
+  priority =
+    gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(cfg_snap->spn_pri));
+  if (priority != snap->priority){
+    SnapSpecType * snap_copy = snap_spec_copy(snap);
+    snap_list_remove_snap_by_name(Crosshair.snaps, snap->name);
+    snap_copy->priority = priority;
+    snap_list_add_snap(Crosshair.snaps, snap_copy);
+  }
+  
+}
+
+void
+add_snap_to_table(GtkWidget * table, int row, ConfigSnapType * cfg_snap)
+{
+  GtkWidget *lbl, *ckbx, *spn;
+  SnapSpecType * snap = snap_list_find_snap_by_name(Crosshair.snaps, cfg_snap->snap_name);
+  
+  if (snap == NULL) return;
+  /* Enable checkbox */
+  ckbx = gtk_check_button_new();
+  gtk_table_attach_defaults(GTK_TABLE(table), ckbx, 0, 1, row, row+1);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ckbx), snap->enabled);
+  cfg_snap->cb_en = ckbx;
+  g_signal_connect(ckbx, "clicked", G_CALLBACK(config_snap_set_cb), cfg_snap);
+  /* Label */
+  lbl = gtk_label_new(snap->name);
+  gtk_table_attach_defaults(GTK_TABLE(table), lbl, 1, 2, row, row+1);
+  cfg_snap->lbl_name = lbl;
+  /* Radius */
+  spn = gtk_spin_button_new_with_range(0,1000, 0.01);
+  gtk_spin_button_set_value(GTK_SPIN_BUTTON(spn), snap->radius/1e6);
+  gtk_table_attach_defaults(GTK_TABLE(table), spn, 2, 3, row, row+1);
+  cfg_snap->spn_rad = spn;
+  g_signal_connect(spn, "value-changed",
+                   G_CALLBACK(config_snap_set_cb), cfg_snap);
+  /* Priority */
+  spn = gtk_spin_button_new_with_range(0,1000, 1);
+  gtk_spin_button_set_value(GTK_SPIN_BUTTON(spn), snap->priority);
+  gtk_table_attach_defaults(GTK_TABLE(table), spn, 3, 4, row, row+1);
+  cfg_snap->spn_pri = spn;
+  g_signal_connect(spn, "value-changed",
+                   G_CALLBACK(config_snap_set_cb), cfg_snap);
+
+}
+
+static void
+config_snaps_tab_create (GtkWidget * tab_vbox)
+{
+  GtkWidget *lbl, *table;
+  int i;
+ 
+  config_snaps_vbox = tab_vbox;
+  table = gtk_table_new(Crosshair.snaps->n, 4, FALSE);
+  config_snaps_table = table;
+  
+  /* Set the header row */
+  lbl = gtk_label_new("Enabled");
+  gtk_table_attach_defaults(GTK_TABLE(table), lbl, 0, 1, 0, 1);
+  lbl = gtk_label_new("Nane");
+  gtk_table_attach_defaults(GTK_TABLE(table), lbl, 1, 2, 0, 1);
+  lbl = gtk_label_new("Radius [mm]");
+  gtk_table_attach_defaults(GTK_TABLE(table), lbl, 2, 3, 0, 1);
+  lbl = gtk_label_new("Priority");
+  gtk_table_attach_defaults(GTK_TABLE(table), lbl, 3, 4, 0, 1);
+  
+  if (config_snaps != 0) free(config_snaps);
+  config_snaps = (ConfigSnapType*)malloc(sizeof(ConfigSnapType)*Crosshair.snaps->n);
+  
+  for (i=0; i < Crosshair.snaps->n; i++){
+    config_snaps[i].snap_name = g_strdup(Crosshair.snaps->snaps[i].name);
+    add_snap_to_table(table, i+1, &config_snaps[i]);
+  }
+  
+  gtk_box_pack_start(GTK_BOX(tab_vbox), table, FALSE, FALSE, 0);
+  
+}
+
   /* -------------- The Colors config page ----------------
    */
 static GtkWidget *config_colors_vbox,
@@ -2234,6 +2359,12 @@ ghid_config_window_show (void)
   gtk_tree_store_set (model, &iter, CONFIG_NAME_COLUMN, _("Colors"), -1);
   vbox = config_page_create (model, &iter, config_notebook);
   config_colors_tab_create (vbox);
+  
+  /* -- Snaps -- */
+  gtk_tree_store_append (model, &iter, NULL);
+  gtk_tree_store_set (model, &iter, CONFIG_NAME_COLUMN, _("Snapping"), -1);
+  vbox = config_page_create (model, &iter, config_notebook);
+  config_snaps_tab_create (vbox);
 
 
   /* Create the tree view
