@@ -917,6 +917,80 @@ SetCrosshairRange (Coord MinX, Coord MinY, Coord MaxX, Coord MaxY)
   MoveCrosshairAbsolute(Crosshair.X, Crosshair.Y);
 }
 
+
+void DrawCrosshair(CrosshairType * c){
+  int x0, y0, x1, y1;
+  double tan60 = sqrt (3);
+
+  
+  /* Draw the basic crosshair */
+  gui->graphics->draw_line (c->GC, c->X, 0, c->X, PCB->MaxHeight);
+  gui->graphics->draw_line (c->GC, 0, c->Y, PCB->MaxWidth, c->Y);
+  
+  if (Crosshair.shape == Union_Jack_Crosshair_Shape){
+    x0 = c->X + (PCB->MaxHeight - c->Y);
+    x0 = MAX(0, MIN (x0, PCB->MaxWidth));
+    x1 = c->X - c->Y;
+    x1 = MAX(0, MIN (x1, PCB->MaxWidth));
+    y0 = c->Y + (PCB->MaxWidth - c->X);
+    y0 = MAX(0, MIN (y0, PCB->MaxHeight));
+    y1 = c->Y - c->X;
+    y1 = MAX(0, MIN (y1, PCB->MaxHeight));
+    gui->graphics->draw_line(c->GC, x0, y0, x1, y1);
+    x0 = c->X - (PCB->MaxHeight - c->Y);
+    x0 = MAX(0, MIN (x0, PCB->MaxWidth));
+    x1 = c->X + c->Y;
+    x1 = MAX(0, MIN (x1, PCB->MaxWidth));
+    y0 = c->Y + c->X;
+    y0 = MAX(0, MIN (y0, PCB->MaxHeight));
+    y1 = c->Y - (PCB->MaxWidth - c->X);
+    y1 = MAX(0, MIN (y1, PCB->MaxHeight));
+    gui->graphics->draw_line(c->GC, x0, y0, x1, y1);
+  } else if (Crosshair.shape == Dozen_Crosshair_Shape){
+    x0 = c->X + (PCB->MaxHeight - c->Y) / tan60;
+    x0 = MAX(0, MIN (x0, PCB->MaxWidth));
+    x1 = c->X - c->Y / tan60;
+    x1 = MAX(0, MIN (x1, PCB->MaxWidth));
+    y0 = c->Y + (PCB->MaxWidth - c->X) * tan60;
+    y0 = MAX(0, MIN (y0, PCB->MaxHeight));
+    y1 = c->Y - c->X * tan60;
+    y1 = MAX(0, MIN (y1, PCB->MaxHeight));
+    gui->graphics->draw_line(c->GC, x0, y0, x1, y1);
+    
+    x0 = c->X + (PCB->MaxHeight - c->Y) * tan60;
+    x0 = MAX(0, MIN (x0, PCB->MaxWidth));
+    x1 = c->X - c->Y * tan60;
+    x1 = MAX(0, MIN (x1, PCB->MaxWidth));
+    y0 = c->Y + (PCB->MaxWidth - c->X) / tan60;
+    y0 = MAX(0, MIN (y0, PCB->MaxHeight));
+    y1 = c->Y - c->X / tan60;
+    y1 = MAX(0, MIN (y1, PCB->MaxHeight));
+    gui->graphics->draw_line(c->GC, x0, y0, x1, y1);
+
+    x0 = c->X - (PCB->MaxHeight - c->Y) / tan60;
+    x0 = MAX(0, MIN (x0, PCB->MaxWidth));
+    x1 = c->X + c->Y / tan60;
+    x1 = MAX(0, MIN (x1, PCB->MaxWidth));
+    y0 = c->Y + c->X * tan60;
+    y0 = MAX(0, MIN (y0, PCB->MaxHeight));
+    y1 = c->Y - (PCB->MaxWidth - c->X) * tan60;
+    y1 = MAX(0, MIN (y1, PCB->MaxHeight));
+    gui->graphics->draw_line(c->GC, x0, y0, x1, y1);
+
+    x0 = c->X - (PCB->MaxHeight - c->Y) * tan60;
+    x0 = MAX(0, MIN (x0, PCB->MaxWidth));
+    x1 = c->X + c->Y * tan60;
+    x1 = MAX(0, MIN (x1, PCB->MaxWidth));
+    y0 = c->Y + c->X / tan60;
+    y0 = MAX(0, MIN (y0, PCB->MaxHeight));
+    y1 = c->Y - (PCB->MaxWidth - c->X) / tan60;
+    y1 = MAX(0, MIN (y1, PCB->MaxHeight));
+    gui->graphics->draw_line(c->GC, x0, y0, x1, y1);
+    
+  }
+  
+
+}
 /** * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * **
  *                                Define snaps                                 *
  ** * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -1204,6 +1278,10 @@ static SnapSpecType polygon_snap = {
 void
 InitCrosshair (void)
 {
+  Crosshair.GC = gui->graphics->make_gc();
+  gui->graphics->set_color(Crosshair.GC, Settings.CrosshairColor);
+  gui->graphics->set_line_width(Crosshair.GC, 0);
+  
   /* set initial shape */
   Crosshair.shape = Basic_Crosshair_Shape;
 
@@ -1232,4 +1310,5 @@ void
 DestroyCrosshair (void)
 {
   FreePolygonMemory (&Crosshair.AttachedPolygon);
+  if(Crosshair.GC) gui->graphics->destroy_gc(Crosshair.GC);
 }

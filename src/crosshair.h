@@ -140,6 +140,7 @@ void HideCrosshair (void);
 void RestoreCrosshair (void);
 void DrawAttached (hidGC gc);
 void DrawMark (hidGC gc);
+void DrawCrosshair(CrosshairType *);
 bool MoveCrosshairAbsolute (Coord, Coord);
 void SetCrosshairRange (Coord, Coord, Coord, Coord);
 void InitCrosshair (void);
